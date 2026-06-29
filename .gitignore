@@ -4,6 +4,9 @@
 .idea/
 .vscode/
 
+# ── Netlify ──────────────────────────────────────────────────
+.netlify/
+
 # ── Python (export tool venv + caches) ───────────────────────
 tools/.venv/
 __pycache__/

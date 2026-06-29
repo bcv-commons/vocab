@@ -1,0 +1,29 @@
+# Netlify deploy config for the Vocab web app (Vite + React, lives in web/).
+# Netlify reads this from the repo root; `base` switches into web/ so pnpm
+# install + build run there. pnpm is selected automatically from the
+# "packageManager" field in web/package.json (via corepack).
+
+[build]
+  base = "web"          # run install + build from web/
+  command = "pnpm build"
+  publish = "dist"      # relative to base → web/dist
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Word API base URL. Public (non-secret) — override in the Netlify UI
+  # (Site settings → Environment variables) if the service moves.
+  # If unset, the app falls back to the default baked into src/lib/api.ts.
+  VITE_API_URL = "https://shoresh.up.qombi.com"
+
+# SPA fallback so a refresh/deep-link never 404s. (No client routing today,
+# so this is just a safety net.)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Vite fingerprints asset filenames (content hashes) → cache them forever.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
