@@ -1,0 +1,21 @@
+# ── OS / editor ──────────────────────────────────────────────
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# ── Python (export tool venv + caches) ───────────────────────
+tools/.venv/
+__pycache__/
+*.pyc
+
+# ── Env files (commit .env.example, not real .env) ───────────
+.env
+.env.local
+.env.*.local
+
+# ── Reference material ───────────────────────────────────────
+# The original Python app under example/ is upstream third-party
+# reference (ch-jensen/Vocab) and carries its own nested .git.
+# Tracked separately upstream; ignored here to avoid a nested repo.
+example/

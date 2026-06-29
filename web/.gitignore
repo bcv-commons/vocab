@@ -1,0 +1,13 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# Local env (the API URL lives in .env; commit .env.example instead)
+.env
+.env.local
+
+# Generated BHSA export files (regenerate with tools/export_bhsa.py)
+public/data/bhsa-*.json
+public/data/bhsa-*.json.gz
+public/data/manifest.json
