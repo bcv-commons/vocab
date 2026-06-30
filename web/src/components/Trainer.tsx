@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Language, PracticeMode, ScoreRecord, WordEntry } from '../types'
 import { getWord } from '../lib/sr'
 import { checkAnswer, splitGlosses } from '../lib/glossCheck'
@@ -7,6 +7,12 @@ import { greekPosLabel, greekTenseLabel, posLabel, tenseLabel } from '../lib/map
 
 const WINDOW = 5
 const CHOICE_COUNT = 4 // total options including the correct one
+
+const MODE_META: Record<PracticeMode, { icon: string; label: string }> = {
+  type:   { icon: 'Aa',   label: 'Type' },
+  choice: { icon: '☰',   label: 'Choice' },
+  reveal: { icon: '○→●', label: 'Reveal' },
+}
 
 function pickChoices(pool: WordEntry[], correct: WordEntry, glossFor: (w: WordEntry) => string): string[] {
   const correctGloss = glossFor(correct)
@@ -72,6 +78,18 @@ export default function Trainer({
   const [input, setInput] = useState('')
   const [revealed, setRevealed] = useState(false)
   const [choices, setChoices] = useState<string[]>([])
+  const [modeOpen, setModeOpen] = useState(false)
+  const modePickerRef = useRef<HTMLDivElement>(null)
+
+  const closeModeOnOutside = useCallback((e: MouseEvent) => {
+    if (modePickerRef.current && !modePickerRef.current.contains(e.target as Node)) {
+      setModeOpen(false)
+    }
+  }, [])
+  useEffect(() => {
+    if (modeOpen) document.addEventListener('mousedown', closeModeOnOutside)
+    return () => document.removeEventListener('mousedown', closeModeOnOutside)
+  }, [modeOpen, closeModeOnOutside])
   const [questionsAnswered, setQuestionsAnswered] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const lastLex = useRef('')
@@ -179,15 +197,6 @@ export default function Trainer({
   return (
     <div className="trainer-wrap">
 
-      {/* ── Mode toggle ───────────────────────────────────────────── */}
-      <div className="seg mode-toggle">
-        {(['type', 'choice', 'reveal'] as PracticeMode[]).map((m) => (
-          <button key={m} className={practiceMode === m ? 'active' : ''} onClick={() => onPracticeMode(m)}>
-            {m.charAt(0).toUpperCase() + m.slice(1)}
-          </button>
-        ))}
-      </div>
-
       {/* ── Result pane ───────────────────────────────────────────── */}
       <div className="result-pane">
         {prevResult ? (
@@ -244,7 +253,26 @@ export default function Trainer({
       )}
 
       {/* ── Input pane ────────────────────────────────────────────── */}
-      <div className="input-pane">
+      <div className="input-pane" style={{ position: 'relative' }}>
+        {/* ── Mode picker ─────────────────────────────────────────── */}
+        <div className="mode-picker" ref={modePickerRef}>
+          <button className="mode-picker-icon" onClick={() => setModeOpen((o) => !o)}
+            title={MODE_META[practiceMode].label}>
+            {MODE_META[practiceMode].icon}
+          </button>
+          {modeOpen && (
+            <div className="mode-picker-menu">
+              {(['type', 'choice', 'reveal'] as PracticeMode[]).map((m) => (
+                <button key={m} className={`mode-picker-option${practiceMode === m ? ' active' : ''}`}
+                  onClick={() => { onPracticeMode(m); setModeOpen(false) }}>
+                  <span className="mode-picker-option-icon">{MODE_META[m].icon}</span>
+                  {MODE_META[m].label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {sessionDone ? (
           <div className="session-summary">
             <div className="session-score">
