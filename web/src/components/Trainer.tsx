@@ -6,6 +6,29 @@ import { updateScore } from '../lib/scores'
 import { greekPosLabel, greekTenseLabel, posLabel, tenseLabel } from '../lib/mappings'
 
 const WINDOW = 5
+const CHOICE_COUNT = 4 // total options including the correct one
+
+function pickChoices(pool: WordEntry[], correct: WordEntry, glossFor: (w: WordEntry) => string): string[] {
+  const correctGloss = glossFor(correct)
+  // Collect unique glosses from other pool words that differ from the correct one.
+  const seen = new Set<string>([correctGloss])
+  const distractors: string[] = []
+  // Shuffle a copy of pool indices for random sampling without repetition.
+  const indices = pool.map((_, i) => i).sort(() => Math.random() - 0.5)
+  for (const i of indices) {
+    if (distractors.length >= CHOICE_COUNT - 1) break
+    const g = glossFor(pool[i])
+    if (!g || g.trim() === '-' || seen.has(g)) continue
+    // Use just the first gloss variant to keep buttons short.
+    const short = g.split(/[;,]/)[0].trim()
+    if (seen.has(short)) continue
+    seen.add(short)
+    distractors.push(short)
+  }
+  // Combine and shuffle.
+  const options = [correctGloss, ...distractors]
+  return options.sort(() => Math.random() - 0.5)
+}
 
 function windowClause(clauseWords: string[], targetIndex: number) {
   if (clauseWords.length <= WINDOW * 2 + 1) return { clauseWords, targetIndex }
@@ -35,18 +58,20 @@ interface Props {
   glossFor: (w: WordEntry) => string
   onScores: (next: ScoreRecord[]) => void
   onSessionComplete: () => void
+  onPracticeMode: (m: PracticeMode) => void
 }
 
 const nowSec = () => Date.now() / 1000
 
 export default function Trainer({
   pool, scores, threshold, showLex, sessionLength, language, practiceMode,
-  glossFor, onScores, onSessionComplete,
+  glossFor, onScores, onSessionComplete, onPracticeMode,
 }: Props) {
   const [currentWord, setCurrentWord] = useState<WordEntry | null>(null)
   const [prevResult, setPrevResult] = useState<PrevResult | null>(null)
   const [input, setInput] = useState('')
   const [revealed, setRevealed] = useState(false)
+  const [choices, setChoices] = useState<string[]>([])
   const [questionsAnswered, setQuestionsAnswered] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const lastLex = useRef('')
@@ -68,6 +93,8 @@ export default function Trainer({
     setCurrentWord(w)
     setInput('')
     setRevealed(false)
+    if (w && modeRef.current === 'choice') setChoices(pickChoices(pool, w, glossFor))
+    else setChoices([])
     questionStart.current = nowSec()
     if (w) lastLex.current = w.lex
     requestAnimationFrame(() => {
@@ -116,6 +143,13 @@ export default function Trainer({
     record(correct, '', splitGlosses(glossFor(currentWord)))
   }
 
+  const pickChoice = (chosen: string) => {
+    if (!currentWord) return
+    const correctGloss = glossFor(currentWord)
+    const correct = chosen === correctGloss
+    record(correct, chosen, splitGlosses(correctGloss))
+  }
+
   // Keyboard for reveal mode: Space/Enter reveals; then 1/← = didn't know, 2/→ = knew it.
   useEffect(() => {
     if (practiceMode !== 'reveal' || !currentWord || sessionDone) return
@@ -144,6 +178,15 @@ export default function Trainer({
 
   return (
     <div className="trainer-wrap">
+
+      {/* ── Mode toggle ───────────────────────────────────────────── */}
+      <div className="seg mode-toggle">
+        {(['type', 'choice', 'reveal'] as PracticeMode[]).map((m) => (
+          <button key={m} className={practiceMode === m ? 'active' : ''} onClick={() => onPracticeMode(m)}>
+            {m.charAt(0).toUpperCase() + m.slice(1)}
+          </button>
+        ))}
+      </div>
 
       {/* ── Result pane ───────────────────────────────────────────── */}
       <div className="result-pane">
@@ -236,6 +279,14 @@ export default function Trainer({
                   autoFocus
                 />
                 <button onClick={submitTyped}>Check</button>
+              </div>
+            ) : practiceMode === 'choice' ? (
+              <div className="choice-grid">
+                {choices.map((c) => (
+                  <button key={c} className="btn secondary choice-btn" onClick={() => pickChoice(c)}>
+                    {c}
+                  </button>
+                ))}
               </div>
             ) : !revealed ? (
               <div className="answer-row">

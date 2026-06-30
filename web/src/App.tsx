@@ -15,7 +15,7 @@ const SESSION_OPTIONS: Array<number | null> = [10, 20, 30, 50, null] // null = c
 // Gloss languages whose script can't reasonably be typed → default to reveal.
 const REVEAL_DEFAULT_LANGS = new Set(['Chinese-Simplified', 'Chinese-Traditional', 'Amharic'])
 const defaultPracticeMode = (glossLanguage: string): PracticeMode =>
-  REVEAL_DEFAULT_LANGS.has(glossLanguage) ? 'reveal' : 'type'
+  REVEAL_DEFAULT_LANGS.has(glossLanguage) ? 'choice' : 'type'
 
 const DEFAULT_FILTERS: Filters = {
   language: 'Hebrew',
@@ -165,10 +165,8 @@ export default function App() {
             poolInfo={poolInfo}
             sessionLength={sessionLength}
             sessionOptions={SESSION_OPTIONS}
-            practiceMode={practiceMode}
             onChange={setFilters}
             onSessionLength={setSessionLength}
-            onPracticeMode={setPracticeMode}
             onReset={resetProgress}
             onClose={() => setFiltersOpen(false)}
           />
@@ -212,6 +210,7 @@ export default function App() {
                 glossFor={glossFor}
                 onScores={updateScores}
                 onSessionComplete={doNewSession}
+                onPracticeMode={setPracticeMode}
               />
             ) : mode === 'Stats' ? (
               <Stats pool={pool} scores={scores} threshold={THRESHOLD} filters={filters} />

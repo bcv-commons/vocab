@@ -1,8 +1,9 @@
 export type Language = 'Hebrew' | 'Aramaic' | 'Greek'
 
-// How the learner answers: type the gloss and check it, or reveal it and
-// self-grade. Reveal is the default for non-Latin gloss scripts (CJK, Ethiopic).
-export type PracticeMode = 'type' | 'reveal'
+// How the learner answers: type the gloss, pick from multiple-choice options,
+// or reveal it and self-grade. Reveal is the default for non-Latin gloss scripts
+// (CJK, Ethiopic). Choice works for any script.
+export type PracticeMode = 'type' | 'choice' | 'reveal'
 
 export interface WordEntry {
   node: number
