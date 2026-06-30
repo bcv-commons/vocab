@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Filters, ScoreRecord, WordEntry } from './types'
+import type { Filters, PracticeMode, ScoreRecord, WordEntry } from './types'
 import { BatchResponse, fetchBatch, fetchGlossLanguages } from './lib/api'
 import { loadScores, saveScores } from './lib/scores'
 import { mapPOS, mapTense, stemLabel } from './lib/mappings'
@@ -11,6 +11,11 @@ import DifficultTables from './components/DifficultTables'
 const THRESHOLD = 5
 type Mode = 'Train' | 'Stats' | 'Difficult'
 const SESSION_OPTIONS: Array<number | null> = [10, 20, 30, 50, null] // null = continuous
+
+// Gloss languages whose script can't reasonably be typed → default to reveal.
+const REVEAL_DEFAULT_LANGS = new Set(['Chinese-Simplified', 'Chinese-Traditional', 'Amharic'])
+const defaultPracticeMode = (glossLanguage: string): PracticeMode =>
+  REVEAL_DEFAULT_LANGS.has(glossLanguage) ? 'reveal' : 'type'
 
 const DEFAULT_FILTERS: Filters = {
   language: 'Hebrew',
@@ -34,6 +39,7 @@ export default function App() {
 
   const [mode, setMode] = useState<Mode>('Train')
   const [sessionLength, setSessionLength] = useState<number | null>(20)
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('type')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scores, setScores] = useState<ScoreRecord[]>([])
 
@@ -56,6 +62,12 @@ export default function App() {
   // Score history is per gloss language.
   useEffect(() => {
     setScores(loadScores(filters.glossLanguage))
+  }, [filters.glossLanguage])
+
+  // Pick the sensible answer mode for the chosen gloss language (reveal for
+  // non-typable scripts). The user can still override it afterwards.
+  useEffect(() => {
+    setPracticeMode(defaultPracticeMode(filters.glossLanguage))
   }, [filters.glossLanguage])
 
   // Debounced fetch whenever filters change. Stale fetches are discarded.
@@ -153,8 +165,10 @@ export default function App() {
             poolInfo={poolInfo}
             sessionLength={sessionLength}
             sessionOptions={SESSION_OPTIONS}
+            practiceMode={practiceMode}
             onChange={setFilters}
             onSessionLength={setSessionLength}
+            onPracticeMode={setPracticeMode}
             onReset={resetProgress}
             onClose={() => setFiltersOpen(false)}
           />
@@ -194,6 +208,7 @@ export default function App() {
                 showLex={filters.showLex}
                 sessionLength={sessionLength}
                 language={filters.language}
+                practiceMode={practiceMode}
                 glossFor={glossFor}
                 onScores={updateScores}
                 onSessionComplete={doNewSession}

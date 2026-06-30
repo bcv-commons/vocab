@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Language, ScoreRecord, WordEntry } from '../types'
+import type { Language, PracticeMode, ScoreRecord, WordEntry } from '../types'
 import { getWord } from '../lib/sr'
-import { checkAnswer } from '../lib/glossCheck'
+import { checkAnswer, splitGlosses } from '../lib/glossCheck'
 import { updateScore } from '../lib/scores'
 import { greekPosLabel, greekTenseLabel, posLabel, tenseLabel } from '../lib/mappings'
 
@@ -21,6 +21,7 @@ interface PrevResult {
   answers: string[]
   clauseWords: string[]
   targetIndex: number
+  mode: PracticeMode
 }
 
 interface Props {
@@ -30,6 +31,7 @@ interface Props {
   showLex: boolean
   sessionLength: number | null
   language: Language
+  practiceMode: PracticeMode
   glossFor: (w: WordEntry) => string
   onScores: (next: ScoreRecord[]) => void
   onSessionComplete: () => void
@@ -38,18 +40,23 @@ interface Props {
 const nowSec = () => Date.now() / 1000
 
 export default function Trainer({
-  pool, scores, threshold, showLex, sessionLength, language, glossFor, onScores, onSessionComplete,
+  pool, scores, threshold, showLex, sessionLength, language, practiceMode,
+  glossFor, onScores, onSessionComplete,
 }: Props) {
   const [currentWord, setCurrentWord] = useState<WordEntry | null>(null)
   const [prevResult, setPrevResult] = useState<PrevResult | null>(null)
   const [input, setInput] = useState('')
+  const [revealed, setRevealed] = useState(false)
   const [questionsAnswered, setQuestionsAnswered] = useState(0)
   const [correctCount, setCorrectCount] = useState(0)
   const lastLex = useRef('')
   const questionStart = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const revealBtnRef = useRef<HTMLButtonElement>(null)
   const scoresRef = useRef(scores)
   scoresRef.current = scores
+  const modeRef = useRef(practiceMode)
+  modeRef.current = practiceMode
 
   const isGreek = language === 'Greek'
   const dir = isGreek ? 'ltr' : 'rtl'
@@ -60,24 +67,24 @@ export default function Trainer({
     const w = getWord(pool, updatedScores, threshold, lastLex.current, nowSec())
     setCurrentWord(w)
     setInput('')
+    setRevealed(false)
     questionStart.current = nowSec()
     if (w) lastLex.current = w.lex
-    // Re-focus after state flush
-    requestAnimationFrame(() => inputRef.current?.focus())
+    requestAnimationFrame(() => {
+      if (modeRef.current === 'type') inputRef.current?.focus()
+      else revealBtnRef.current?.focus()
+    })
   }
 
   useEffect(() => { drawNext(scoresRef.current) }, []) // mount only; key={batchId} resets on new session
 
-  if (!pool.length) {
-    return <p className="empty">No words match the current filters.</p>
-  }
-
   const sessionDone = sessionLength !== null && questionsAnswered >= sessionLength
 
-  const submit = () => {
+  // Shared scoring path for both modes.
+  function record(correct: boolean, given: string, answers: string[]) {
     if (!currentWord || sessionDone) return
     const timeSpent = Math.max(0.001, nowSec() - questionStart.current)
-    const { correct, answers } = checkAnswer(input, glossFor(currentWord))
+    // Wrong answers are predated so the SR algorithm resurfaces them soon.
     const timeStamp = correct ? questionStart.current : nowSec() - threshold * 200000
     const updated = updateScore(scoresRef.current, currentWord, timeSpent, timeStamp, correct)
     onScores(updated)
@@ -85,34 +92,55 @@ export default function Trainer({
     const { clauseWords: cw, targetIndex: ti } = windowClause(
       currentWord.clauseWords, currentWord.targetIndex,
     )
-    setPrevResult({ word: currentWord, correct, given: input, answers, clauseWords: cw, targetIndex: ti })
+    setPrevResult({ word: currentWord, correct, given, answers, clauseWords: cw, targetIndex: ti, mode: modeRef.current })
 
     const newCount = questionsAnswered + 1
     setQuestionsAnswered(newCount)
     if (correct) setCorrectCount((n) => n + 1)
 
     if (sessionLength !== null && newCount >= sessionLength) {
-      setCurrentWord(null) // triggers session-done state in input pane
+      setCurrentWord(null) // triggers session-done state
     } else {
       drawNext(updated)
     }
   }
 
+  const submitTyped = () => {
+    if (!currentWord) return
+    const { correct, answers } = checkAnswer(input, glossFor(currentWord))
+    record(correct, input, answers)
+  }
+
+  const grade = (correct: boolean) => {
+    if (!currentWord) return
+    record(correct, '', splitGlosses(glossFor(currentWord)))
+  }
+
+  // Keyboard for reveal mode: Space/Enter reveals; then 1/← = didn't know, 2/→ = knew it.
+  useEffect(() => {
+    if (practiceMode !== 'reveal' || !currentWord || sessionDone) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!revealed) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setRevealed(true) }
+      } else if (e.key === '1' || e.key === 'ArrowLeft') { e.preventDefault(); grade(false) }
+      else if (e.key === '2' || e.key === 'ArrowRight') { e.preventDefault(); grade(true) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [practiceMode, revealed, currentWord, sessionDone, questionsAnswered]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!pool.length) {
+    return <p className="empty">No words match the current filters.</p>
+  }
+
   const wordMeta = (w: WordEntry) => {
     const pl = isGreek ? (greekPosLabel[w.pos] ?? w.pos) : (posLabel[w.pos] ?? w.pos)
     const tl = isGreek ? (greekTenseLabel[w.tense] ?? w.tense) : (tenseLabel[w.tense] ?? w.tense)
-    return [
-      `rank ${w.rank}`,
-      pl,
-      w.tense !== 'NA' ? tl : null,
-      w.stem !== 'NA' ? w.stem : null,
-    ].filter(Boolean).join(' · ')
+    return [`rank ${w.rank}`, pl, w.tense !== 'NA' ? tl : null, w.stem !== 'NA' ? w.stem : null]
+      .filter(Boolean).join(' · ')
   }
 
-  // Windowed clause for current word
-  const cur = currentWord
-    ? windowClause(currentWord.clauseWords, currentWord.targetIndex)
-    : null
+  const cur = currentWord ? windowClause(currentWord.clauseWords, currentWord.targetIndex) : null
 
   return (
     <div className="trainer-wrap">
@@ -128,20 +156,20 @@ export default function Trainer({
               </span>
             </div>
 
-            <div className="clause clause-sm" lang={lang}
-              style={{ direction: dir, textAlign: align }}>
+            <div className="clause clause-sm" lang={lang} style={{ direction: dir, textAlign: align }}>
               {prevResult.clauseWords.map((w, i) => (
                 <span key={i} className={i === prevResult.targetIndex ? 'target' : ''}>{w}</span>
               ))}
             </div>
 
-            {!prevResult.correct && (
+            {prevResult.mode === 'reveal' ? (
+              <div className="answer-line">Gloss: <strong>{prevResult.answers.join(', ')}</strong></div>
+            ) : !prevResult.correct ? (
               <div className="answer-line wrong">
                 Correct: <strong>{prevResult.answers.join(', ')}</strong>
                 {prevResult.given && <> — you wrote: &ldquo;{prevResult.given}&rdquo;</>}
               </div>
-            )}
-            {prevResult.correct && (() => {
+            ) : (() => {
               const others = prevResult.answers
                 .map((a) => a.replace(/\([a-z]*\)/g, '').trim())
                 .filter((a) => a !== prevResult.given)
@@ -177,8 +205,8 @@ export default function Trainer({
         {sessionDone ? (
           <div className="session-summary">
             <div className="session-score">
-              {correctCount} / {sessionLength} correct
-              {' '}({Math.round((correctCount / sessionLength!) * 100)}%)
+              {correctCount} / {sessionLength} correct{' '}
+              ({Math.round((correctCount / sessionLength!) * 100)}%)
             </div>
             <button className="btn" onClick={onSessionComplete}>Go again →</button>
           </div>
@@ -197,17 +225,37 @@ export default function Trainer({
               </div>
             )}
 
-            <div className="answer-row">
-              <input
-                ref={inputRef}
-                placeholder="Gloss…"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submit()}
-                autoFocus
-              />
-              <button onClick={submit}>Check</button>
-            </div>
+            {practiceMode === 'type' ? (
+              <div className="answer-row">
+                <input
+                  ref={inputRef}
+                  placeholder="Gloss…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitTyped()}
+                  autoFocus
+                />
+                <button onClick={submitTyped}>Check</button>
+              </div>
+            ) : !revealed ? (
+              <div className="answer-row">
+                <button ref={revealBtnRef} className="btn block" onClick={() => setRevealed(true)}>
+                  Reveal answer <span className="key-hint">space</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="reveal-gloss">{glossFor(currentWord)}</div>
+                <div className="grade-row">
+                  <button className="btn grade-wrong" onClick={() => grade(false)}>
+                    ✗ Didn’t know <span className="key-hint">1</span>
+                  </button>
+                  <button className="btn grade-right" onClick={() => grade(true)}>
+                    ✓ Knew it <span className="key-hint">2</span>
+                  </button>
+                </div>
+              </>
+            )}
           </>
         ) : null}
       </div>

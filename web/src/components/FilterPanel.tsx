@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Filters, Language } from '../types'
+import type { Filters, Language, PracticeMode } from '../types'
 import {
   GREEK_VOICES,
   greekVoiceLabel,
@@ -22,8 +22,10 @@ interface Props {
   poolInfo: { count: number; total: number } | null
   sessionLength: number | null
   sessionOptions: Array<number | null>
+  practiceMode: PracticeMode
   onChange: (f: Filters) => void
   onSessionLength: (n: number | null) => void
+  onPracticeMode: (m: PracticeMode) => void
   onReset: () => void
   onClose: () => void // closes the mobile drawer
 }
@@ -76,8 +78,8 @@ function defaultsForLanguage(lang: Language): Pick<Filters, 'pos' | 'stems' | 't
 }
 
 export default function FilterPanel({
-  filters, glossLanguages, poolInfo, sessionLength, sessionOptions,
-  onChange, onSessionLength, onReset, onClose,
+  filters, glossLanguages, poolInfo, sessionLength, sessionOptions, practiceMode,
+  onChange, onSessionLength, onPracticeMode, onReset, onClose,
 }: Props) {
   const isGreek = filters.language === 'Greek'
   const TABS = isGreek ? TABS_GRK : TABS_HEB
@@ -185,8 +187,19 @@ export default function FilterPanel({
           : 'Fetching…'}
       </div>
 
-      {/* Session + reset live here so the toolbar stays clean on mobile */}
+      {/* Session + answer mode + reset live here so the toolbar stays clean */}
       <div className="filter-divider" />
+      <div className="filter-section">
+        <div className="filter-label">Answer mode</div>
+        <div className="seg">
+          <button className={practiceMode === 'type' ? 'active' : ''} onClick={() => onPracticeMode('type')}>
+            Type
+          </button>
+          <button className={practiceMode === 'reveal' ? 'active' : ''} onClick={() => onPracticeMode('reveal')}>
+            Reveal
+          </button>
+        </div>
+      </div>
       <div className="filter-section">
         <div className="filter-label">Session length</div>
         <div className="seg">

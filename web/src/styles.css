@@ -157,6 +157,22 @@ input[type='number'], select {
 .session-summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 0; }
 .session-score { font-size: 20px; font-weight: 700; }
 
+/* ── Reveal mode ───────────────────────────────────────────────────────────── */
+.reveal-gloss {
+  font-size: 26px; font-weight: 600; margin: 12px 0 16px;
+  padding: 14px 16px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.grade-row { display: flex; gap: 10px; }
+.grade-row .btn { flex: 1; padding: 14px; font-size: 15px; }
+.grade-wrong { background: var(--red); }
+.grade-right { background: var(--green); }
+.key-hint {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  font-size: 11px; border-radius: 4px; background: rgba(255, 255, 255, 0.25);
+}
+.btn.secondary .key-hint { background: rgba(0, 0, 0, 0.08); }
+
 /* ── Stats ───────────────────────────────────────────────────────────────────── */
 .stats-grid { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
 .stat-line { margin: 6px 0; }
