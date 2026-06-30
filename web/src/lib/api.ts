@@ -8,6 +8,7 @@ import { mapGreekPOS, mapGreekTense, mapPOS, mapTense } from './mappings'
 export interface BatchResponse {
   language: Language
   total_pool: number
+  gloss_pool?: number // # lexemes with a gloss, present when gloss_lang is set
   count: number
   words: WordEntry[]
 }
@@ -50,6 +51,12 @@ export async function fetchBatch(
   // the user wants to exclude words with pronominal suffixes.
   if (!isGreek && !filters.includeSuffix) p.set('suffix', 'false')
 
+  // Non-English glosses are resolved server-side; this also filters the pool to
+  // lexemes that have a gloss in the chosen language.
+  if (filters.glossLanguage && filters.glossLanguage !== 'English') {
+    p.set('gloss_lang', filters.glossLanguage)
+  }
+
   p.set('limit', String(Math.min(limit, 500)))
   if (random) p.set('random', 'true')
 
@@ -60,6 +67,18 @@ export async function fetchBatch(
     throw new Error(`API ${res.status}: ${msg}`)
   }
   return res.json() as Promise<BatchResponse>
+}
+
+// Available gloss languages for a source language (always includes "English").
+export async function fetchGlossLanguages(language: Language): Promise<string[]> {
+  try {
+    const res = await fetch(`${BASE}/gloss-languages?language=${encodeURIComponent(language)}`)
+    if (!res.ok) return ['English']
+    const data = (await res.json()) as { languages?: string[] }
+    return data.languages?.length ? data.languages : ['English']
+  } catch {
+    return ['English']
+  }
 }
 
 // Distinct stem/voice codes present in a word list (for the Stem/Voice filter).

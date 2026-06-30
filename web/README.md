@@ -51,15 +51,14 @@ The Python extractor in `../tools/export_bhsa.py` documents how the BHSA word
 records were produced from `text-fabric` (used to build the API's data); the
 frontend no longer reads any static word file.
 
-## Custom gloss languages
+## Gloss languages
 
-The gloss-language selector reads `public/data/glosses/manifest.json` and loads
-`<Language>_glosses.csv` files in the original Danish format (index, `lex`,
-`default`, then one column per verbal stem). Resolution matches the original:
-verbs use their stem column (falling back to the first non-empty one), other
-words use `default`; the pool is restricted to lexemes that actually have a
-gloss. The Danish set from the upstream repo ships here (1631 lexemes). To add a
-language, drop its CSV in `public/data/glosses/` and add an entry to the manifest.
+Glosses are served by the API. `GET /gloss-languages?language=<lang>` lists the
+options (always includes English), and `GET /words?...&gloss_lang=<lang>` returns
+each word's `gloss` already resolved in that language (verb→stem column with
+fallback, others→default) and filters the pool to lexemes that have one. The
+client just sends `gloss_lang` and reads `word.gloss` — no gloss data ships in
+the frontend. To add a language, load its data on the server.
 
 ## Hebrew font
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Filters, ScoreRecord, WordEntry } from './types'
-import { BatchResponse, fetchBatch } from './lib/api'
-import { GlossLanguage, GlossSet, lexemesWithGloss, loadGlossLanguages, loadGlossSet, resolveGloss } from './lib/glosses'
+import { BatchResponse, fetchBatch, fetchGlossLanguages } from './lib/api'
 import { loadScores, saveScores } from './lib/scores'
 import { mapPOS, mapTense, stemLabel } from './lib/mappings'
 import FilterPanel from './components/FilterPanel'
@@ -38,20 +37,21 @@ export default function App() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [scores, setScores] = useState<ScoreRecord[]>([])
 
-  const [glossLangs, setGlossLangs] = useState<GlossLanguage[]>([])
-  const [glossSet, setGlossSet] = useState<GlossSet | null>(null)
-
-  useEffect(() => { loadGlossLanguages().then(setGlossLangs) }, [])
-
-  // Load/clear custom gloss set when gloss language changes.
+  // Gloss languages available for the current source language (from the API).
+  const [glossLangs, setGlossLangs] = useState<string[]>(['English'])
   useEffect(() => {
     let cancelled = false
-    if (filters.glossLanguage === 'English') { setGlossSet(null); return }
-    const lang = glossLangs.find((g) => g.name === filters.glossLanguage)
-    if (!lang) return
-    loadGlossSet(lang.file).then((s) => { if (!cancelled) setGlossSet(s) })
+    fetchGlossLanguages(filters.language).then((langs) => {
+      if (cancelled) return
+      setGlossLangs(langs)
+      // If the selected gloss language isn't offered for this source language,
+      // fall back to English.
+      if (!langs.includes(filters.glossLanguage)) {
+        setFilters((f) => ({ ...f, glossLanguage: 'English' }))
+      }
+    })
     return () => { cancelled = true }
-  }, [filters.glossLanguage, glossLangs])
+  }, [filters.language]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Score history is per gloss language.
   useEffect(() => {
@@ -102,29 +102,17 @@ export default function App() {
     saveScores(filters.glossLanguage, next)
   }
 
-  // Restrict pool: drop words with no usable gloss, and words whose
-  // clauseWords are entirely empty (BHSA split-off tokens with no text).
+  // The API already resolves the gloss (per gloss_lang) and filters the pool to
+  // lexemes that have one. We only drop placeholder glosses and empty clauses.
   const pool: WordEntry[] = useMemo(() => {
     if (!batch) return []
-    let words = batch.words.filter(
+    return batch.words.filter(
       (w) => w.gloss && w.gloss.trim() !== '-' && w.clauseWords.some((t) => t.trim()),
     )
-    if (glossSet) {
-      const have = lexemesWithGloss(glossSet)
-      words = words.filter((w) => have.has(w.lex))
-    }
-    return words
-  }, [batch, glossSet])
+  }, [batch])
 
-  const glossFor = useCallback(
-    (w: WordEntry) => (glossSet ? resolveGloss(w, glossSet) ?? '' : w.gloss),
-    [glossSet],
-  )
-
-  const glossLanguageNames = useMemo(
-    () => ['English', ...glossLangs.map((g) => g.name)],
-    [glossLangs],
-  )
+  // Gloss arrives pre-resolved in the active language; just read it.
+  const glossFor = useCallback((w: WordEntry) => w.gloss, [])
 
   const poolInfo = batch
     ? { count: batch.words.length, total: batch.total_pool }
@@ -161,7 +149,7 @@ export default function App() {
         <div className={`filters-host ${filtersOpen ? 'open' : ''}`}>
           <FilterPanel
             filters={filters}
-            glossLanguages={glossLanguageNames}
+            glossLanguages={glossLangs}
             poolInfo={poolInfo}
             sessionLength={sessionLength}
             sessionOptions={SESSION_OPTIONS}
