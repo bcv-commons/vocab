@@ -240,21 +240,20 @@ export default function Trainer({
         )}
       </div>
 
-      {/* ── Progress bar ──────────────────────────────────────────── */}
-      {sessionLength !== null && (
-        <div className="session-progress">
-          <span>{questionsAnswered} / {sessionLength}</span>
-          <div className="progress-track">
-            <div className="progress-fill"
-              style={{ width: `${Math.min(questionsAnswered / sessionLength, 1) * 100}%` }} />
-          </div>
-          <span>{correctCount} correct</span>
-        </div>
-      )}
-
-      {/* ── Input pane ────────────────────────────────────────────── */}
-      <div className="input-pane" style={{ position: 'relative' }}>
-        {/* ── Mode picker ─────────────────────────────────────────── */}
+      {/* ── Progress bar + mode picker ────────────────────────────── */}
+      <div className="session-progress">
+        {sessionLength !== null ? (
+          <>
+            <span>{questionsAnswered} / {sessionLength}</span>
+            <div className="progress-track">
+              <div className="progress-fill"
+                style={{ width: `${Math.min(questionsAnswered / sessionLength, 1) * 100}%` }} />
+            </div>
+            <span>{correctCount} correct</span>
+          </>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
         <div className="mode-picker" ref={modePickerRef}>
           <button className="mode-picker-icon" onClick={() => setModeOpen((o) => !o)}
             title={MODE_META[practiceMode].label}>
@@ -272,7 +271,10 @@ export default function Trainer({
             </div>
           )}
         </div>
+      </div>
 
+      {/* ── Input pane ────────────────────────────────────────────── */}
+      <div className="input-pane">
         {sessionDone ? (
           <div className="session-summary">
             <div className="session-score">

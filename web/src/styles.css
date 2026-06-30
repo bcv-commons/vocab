@@ -157,13 +157,13 @@ input[type='number'], select {
 .session-summary { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 0; }
 .session-score { font-size: 20px; font-weight: 700; }
 
-/* ── Mode picker (corner icon in exercise pane) ─────────────────────────────── */
-.mode-picker { position: absolute; top: 4px; right: 0; z-index: 10; }
+/* ── Mode picker (right side of progress bar row) ───────────────────────────── */
+.mode-picker { position: relative; flex-shrink: 0; }
 .mode-picker-icon {
-  border: none; background: none; cursor: pointer; padding: 4px 6px;
-  font-size: 13px; color: var(--muted); line-height: 1; border-radius: 6px;
+  border: none; background: var(--border); cursor: pointer; padding: 4px 8px;
+  font-size: 13px; color: var(--text); line-height: 1; border-radius: 6px;
 }
-.mode-picker-icon:hover { background: var(--border); color: var(--text); }
+.mode-picker-icon:hover { background: #d1d5db; }
 .mode-picker-menu {
   position: absolute; right: 0; top: calc(100% + 4px);
   background: var(--panel); border: 1px solid var(--border);
